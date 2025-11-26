@@ -10,14 +10,12 @@ const isLoading = ref(true);
 const appointment = ref(null);
 const error = ref(null);
 
-// Get the ID from the URL (e.g., /appointment/1)
 const appointmentId = route.params.id;
 
 // --- Fetch Data ---
 onMounted(async () => {
   try {
     const response = await apiService.getAppointmentById(appointmentId);
-    // Adjust .data or .data.data depending on your Laravel Resource wrapper
     appointment.value = response.data.data || response.data;
   } catch (err) {
     console.error(err);
@@ -31,104 +29,140 @@ onMounted(async () => {
 const cancelAppointment = async () => {
   if (!confirm("Are you sure you want to cancel this appointment?")) return;
 
+  if (isLoading.value) return;
+  isLoading.value = true;
+
   try {
     await apiService.deleteAppointment(appointmentId);
     alert("Appointment cancelled successfully.");
-    router.push('/dashboard'); // Go back to dashboard
+    router.push('/dashboard');
   } catch (err) {
     alert("Failed to delete appointment.");
+  } finally {
+    isLoading.value = false;
   }
 };
 
-const goBack = () => router.back();
+const goBack = () => router.push('/dashboard');
 </script>
 
 <template>
   <div class="page-container">
-    
+
     <header class="app-bar">
-      <button @click="goBack" class="back-btn">←</button>
+      <button @click="goBack" class="back-btn">
+        <span class="material-icon">←</span>
+      </button>
       <h1>Appointment Details</h1>
     </header>
 
-    <div v-if="isLoading" class="center-msg">Loading details...</div>
-    <div v-else-if="error" class="center-msg error">{{ error }}</div>
+    <div class="content-wrapper">
+      <div v-if="isLoading" class="center-msg loading-msg">Loading details...</div>
+      <div v-else-if="error" class="center-msg error">{{ error }}</div>
 
-    <div v-else-if="appointment" class="content-body">
-      
-      <div class="details-card">
-        
-        <div class="detail-row">
-          <div class="icon-box">👤</div> <div class="info-text">
-            <span class="label">Patient Name</span>
-            <span class="value">{{ appointment.name }}</span>
+      <div v-else-if="appointment" class="content-body">
+
+        <div class="details-card">
+
+          <!-- Row: Patient Name -->
+          <div class="detail-row">
+            <div class="icon-box">👤</div>
+            <div class="info-text">
+              <span class="label">Patient Name</span>
+              <span class="value">{{ appointment.name }}</span>
+            </div>
           </div>
+
+          <div class="divider"></div>
+
+          <!-- Row: Status -->
+          <div class="detail-row">
+            <div class="icon-box">ⓘ</div>
+            <div class="info-text">
+              <span class="label">Status</span>
+              <span class="status-value" :class="appointment.status.toLowerCase()">{{ appointment.status }}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Row: Animal -->
+          <div class="detail-row">
+            <div class="icon-box">🐾</div>
+            <div class="info-text">
+              <span class="label">Animal</span>
+              <span class="value">{{ appointment.animal_type || appointment.animal }}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Row: Date -->
+          <div class="detail-row">
+            <div class="icon-box">📅</div>
+            <div class="info-text">
+              <span class="label">Date</span>
+              <span class="value">{{ appointment.date }}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Row: Time -->
+          <div class="detail-row">
+            <div class="icon-box">🕒</div>
+            <div class="info-text">
+              <span class="label">Time</span>
+              <span class="value">{{ appointment.time }}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Row: Age -->
+          <div class="detail-row">
+            <div class="icon-box">🎂</div>
+            <div class="info-text">
+              <span class="label">Age</span>
+              <span class="value">{{ appointment.age }} years old</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Row: Sex -->
+          <div class="detail-row">
+            <div class="icon-box">⚧</div>
+            <div class="info-text">
+              <span class="label">Sex</span>
+              <span class="value">{{ appointment.sex }}</span>
+            </div>
+          </div>
+
+        </div> <!-- End Card -->
+
+        <!-- Cancel Button -->
+        <div class="footer-action">
+          <button class="btn-cancel" @click="cancelAppointment" :disabled="isLoading">
+            <span class="trash-icon">🗑</span>
+            {{ isLoading ? 'Cancelling...' : 'Cancel Appointment' }}
+          </button>
         </div>
 
-        <div class="divider"></div>
-
-        <div class="detail-row">
-          <div class="icon-box">🐾</div>
-          <div class="info-text">
-            <span class="label">Animal</span>
-            <span class="value">{{ appointment.animal_type || appointment.animal }}</span>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="detail-row">
-          <div class="icon-box">📅</div>
-          <div class="info-text">
-            <span class="label">Date</span>
-            <span class="value">{{ appointment.date }}</span>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="detail-row">
-          <div class="icon-box">🕒</div>
-          <div class="info-text">
-            <span class="label">Time</span>
-            <span class="value">{{ appointment.time }}</span>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="detail-row">
-          <div class="icon-box">ℹ️</div>
-          <div class="info-text">
-            <span class="label">Age</span>
-            <span class="value">{{ appointment.age }} years old</span>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="detail-row">
-          <div class="icon-box">⚧</div>
-          <div class="info-text">
-            <span class="label">Sex</span>
-            <span class="value">{{ appointment.sex }}</span>
-          </div>
-        </div>
-
-      </div> <div class="footer-action">
-        <button class="btn-cancel" @click="cancelAppointment">
-          <span class="trash-icon">🗑</span> Cancel Appointment
-        </button>
       </div>
-
     </div>
   </div>
 </template>
 
 <style scoped>
+/* =========================================
+   DASHBOARD STYLE APPLICATION (Blue/White)
+   ========================================= */
+
 /* Layout */
 .page-container {
-  background-color: #fcfcfc;
+  background-color: #F5F7FA;
+  /* Match Dashboard BG */
   min-height: 100vh;
   font-family: 'Segoe UI', sans-serif;
   display: flex;
@@ -139,27 +173,41 @@ const goBack = () => router.back();
 .app-bar {
   display: flex;
   align-items: center;
-  padding: 16px;
+  padding: 15px 20px;
   background: white;
-  /* border-bottom: 1px solid #f0f0f0; */
+  border-bottom: 1px solid #CFD8DC;
+  /* Stroke */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
+
 .back-btn {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   cursor: pointer;
   margin-right: 15px;
-  color: #333;
+  color: #1565C0;
+  /* Primary Blue */
 }
+
+.back-btn:hover {
+  color: #0D47A1;
+}
+
 .app-bar h1 {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   margin: 0;
-  font-weight: 500;
+  font-weight: 600;
+  color: #263238;
 }
 
 /* Body */
+.content-wrapper {
+  padding: 30px;
+  flex-grow: 1;
+}
+
 .content-body {
-  padding: 20px;
   max-width: 500px;
   margin: 0 auto;
   width: 100%;
@@ -171,7 +219,9 @@ const goBack = () => router.back();
   background: white;
   border-radius: 16px;
   padding: 10px 20px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #CFD8DC;
+  /* Stroke */
   margin-bottom: 30px;
 }
 
@@ -185,7 +235,8 @@ const goBack = () => router.back();
 .icon-box {
   width: 40px;
   font-size: 1.5rem;
-  color: #009688; /* Teal color */
+  color: #1565C0;
+  /* Primary Blue */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,33 +250,63 @@ const goBack = () => router.back();
 
 .label {
   font-size: 0.8rem;
-  color: #9e9e9e;
+  color: #78909C;
+  /* Soft Grey Label */
   margin-bottom: 2px;
 }
 
 .value {
   font-size: 1.1rem;
-  color: #222;
-  font-weight: 500;
+  color: #263238;
+  font-weight: 600;
 }
+
+.status-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.status-value.pending {
+  background: #FFF3E0;
+  color: #EF6C00;
+  border: 1px solid #FFE0B2;
+}
+
+.status-value.confirmed {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #C8E6C9;
+}
+
+.status-value.cancelled {
+  background: #FFEBEE;
+  color: #C62828;
+  border: 1px solid #FFCDD2;
+}
+
 
 /* Divider Line */
 .divider {
   height: 1px;
-  background-color: #eee;
-  margin-left: 55px; /* Offset to align with text */
+  background-color: #E0E0E0;
+  margin-left: 55px;
+  /* Offset to align with text */
 }
 
 /* Cancel Button */
 .footer-action {
-  margin-top: auto;
+  padding-bottom: 20px;
 }
 
 .btn-cancel {
   width: 100%;
-  background-color: #FFCDD2; /* Light Red/Pink bg */
-  color: #C62828; /* Dark Red text */
-  border: none;
+  background-color: #FFEBEE;
+  /* Light Red/Pink bg */
+  color: #C62828;
+  /* Dark Red text */
+  border: 1px solid #FFCDD2;
   padding: 15px;
   border-radius: 30px;
   font-size: 1rem;
@@ -238,7 +319,13 @@ const goBack = () => router.back();
 }
 
 .btn-cancel:hover {
-  background-color: #EF9A9A;
+  background-color: #FFCDD2;
+}
+
+.btn-cancel:disabled {
+  background-color: #FAFAFA;
+  color: #999;
+  cursor: wait;
 }
 
 .trash-icon {
@@ -248,7 +335,15 @@ const goBack = () => router.back();
 .center-msg {
   text-align: center;
   margin-top: 50px;
-  color: #888;
+  color: #78909C;
 }
-.error { color: red; }
+
+.loading-msg {
+  font-size: 1.2rem;
+  color: #1565C0;
+}
+
+.error {
+  color: #C62828;
+}
 </style>

@@ -66,16 +66,8 @@ export default {
     return apiClient.get('/appointments');
   },
 
-  // ===== PATIENTS =====
-  getAllPatients() {
-    return apiClient.get('/patients');
-  },
 
-  // ===== DOCTORS =====
-  getAllDoctors() {
-    return apiClient.get('/doctors');
-  },
-  // 1. Get Stats (Total Appts, Vaccine Count)
+  // 1. Get Stats (Total Appointment, Vaccine Count)
   getAdminStats() {
     // Backend should return: { total_appointments: 100, vaccine_stock: 42, upcoming: 5 }
     return apiClient.get('/admin/stats');

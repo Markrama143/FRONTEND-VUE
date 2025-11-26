@@ -3,26 +3,25 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import apiService from '@/services/apiService';
 
-// --- State & Data ---
 const router = useRouter();
-const currentTab = ref('appointments'); // Default tab
+const currentTab = ref('appointments');
 const appointments = ref([]);
 const isLoading = ref(true);
 const error = ref(null);
+const isSidebarOpen = ref(false); // Added for mobile menu
 
-// --- CALENDAR STATE ---
+const vaccineInfo = ref({ name: 'Anti-Rabies (Verorab)', remaining: 42 });
+
+// --- Calendar State ---
 const today = new Date();
 const currentMonth = ref(today.getMonth());
 const currentYear = ref(today.getFullYear());
 const selectedDate = ref(today.getDate());
 
-// Mock Data for Vaccine
-const vaccineInfo = ref({
-  name: 'Anti-Rabies (Verorab)',
-  remaining: 42
-});
+const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
 
-// --- API Fetch Function ---
 const fetchAppointments = async () => {
   isLoading.value = true;
   error.value = null;
@@ -32,7 +31,9 @@ const fetchAppointments = async () => {
   } catch (err) {
     console.error("API Error:", err);
     if (err.response && err.response.status === 401) {
-      handleLogout(); // Auto-logout on 401
+      error.value = "Session expired. Redirecting...";
+      localStorage.removeItem('user_token');
+      router.push('/');
     } else {
       error.value = "Failed to load appointments.";
     }
@@ -41,112 +42,146 @@ const fetchAppointments = async () => {
   }
 };
 
-onMounted(() => {
-  fetchAppointments();
+onMounted(() => { fetchAppointments(); });
+
+// --- SORTING FIX: Compute a new array sorted by ID ascending ---
+const sortedAppointments = computed(() => {
+  // Create a shallow copy of the array before sorting to avoid mutating the original data
+  return [...appointments.value].sort((a, b) => a.id - b.id);
 });
+// -----------------------------------------------------------------
 
-// --- LOGOUT LOGIC ---
-const handleLogout = () => {
-  if (confirm("Are you sure you want to log out?")) {
-    // 1. Clear Local Storage
-    localStorage.removeItem('user_token');
-    localStorage.removeItem('user_role');
-
-    // 2. Redirect to Login
-    router.push('/');
-  }
-};
-
-// --- CALENDAR LOGIC ---
+// --- Calendar Logic FIX ---
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const formattedMonthYear = computed(() => {
-  return `${monthNames[currentMonth.value]} ${currentYear.value}`;
-});
+const formattedMonthYear = computed(() => `${monthNames[currentMonth.value]} ${currentYear.value}`);
 
 const calendarDays = computed(() => {
   const days = [];
-  const firstDay = new Date(currentYear.value, currentMonth.value, 1).getDay();
+  const startOfMonth = new Date(currentYear.value, currentMonth.value, 1);
+  const firstDayOfWeek = startOfMonth.getDay(); // 0 (Sun) to 6 (Sat)
   const daysInMonth = new Date(currentYear.value, currentMonth.value + 1, 0).getDate();
 
-  for (let i = 0; i < firstDay; i++) {
+  // 1. Padding days (previous month dates, for visual completeness)
+  for (let i = 0; i < firstDayOfWeek; i++) {
     days.push({ day: '', type: 'padding' });
   }
 
+  // 2. Actual days in the current month
   for (let i = 1; i <= daysInMonth; i++) {
+    // Mock status logic remains the same
     let status = 'available';
     if (i % 7 === 0) status = 'full';
     else if (i % 5 === 0) status = 'half';
 
-    days.push({
-      day: i,
-      type: 'current',
-      status: status
-    });
+    days.push({ day: i, type: 'current', status });
   }
+
+  // 3. Fill the end of the last week with padding if necessary
+  const remainingCells = 42 - days.length; // Max 6 weeks * 7 days = 42
+  for (let i = 0; i < remainingCells && days.length < 42; i++) {
+    days.push({ day: '', type: 'padding' });
+  }
+
   return days;
 });
 
 const changeMonth = (step) => {
   let newMonth = currentMonth.value + step;
-  if (newMonth > 11) {
-    currentMonth.value = 0;
-    currentYear.value++;
-  } else if (newMonth < 0) {
-    currentMonth.value = 11;
-    currentYear.value--;
-  } else {
-    currentMonth.value = newMonth;
-  }
+  if (newMonth > 11) { currentMonth.value = 0; currentYear.value++; }
+  else if (newMonth < 0) { currentMonth.value = 11; currentYear.value--; }
+  else { currentMonth.value = newMonth; }
 };
 
-const selectDate = (day) => {
-  if (day.type === 'current') {
-    selectedDate.value = day.day;
-  }
-};
-
-// --- Navigation ---
 const navigateToBook = () => { router.push('/create'); };
-const openDetails = (appt) => {
-  router.push(`/appointment/${appt.id}`);
+const openDetails = (appointment) => { router.push(`/appointment/${appointment.id}`); };
+
+// --- NEW EDIT HANDLER ---
+const navigateToEdit = (appointment, event) => {
+  // Stop event propagation so the parent row's click (openDetails) doesn't fire
+  event.stopPropagation();
+  router.push(`/edit-appointment/${appointment.id}`);
+};
+// ------------------------
+
+const handleLogout = () => {
+  localStorage.removeItem('user_token');
+  localStorage.removeItem('user_role');
+  router.push('/');
 };
 </script>
 
 <template>
-  <div class="layout-container">
+  <div class="dashboard-layout">
 
-    <aside class="sidebar">
+    <!-- MOBILE OVERLAY -->
+    <div class="mobile-overlay" :class="{ 'show': isSidebarOpen }" @click="toggleSidebar"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" :class="{ 'open': isSidebarOpen }">
       <div class="brand">
-        <h2>BiteCare</h2>
+        <h2>BiteCare <span class="role-badge">USER</span></h2>
+        <button class="close-btn-mobile" @click="toggleSidebar">✕</button>
       </div>
-      <nav>
-        <div class="nav-item" :class="{ active: currentTab === 'appointments' }" @click="currentTab = 'appointments'">
+
+      <nav class="nav-menu">
+        <div class="nav-section-label">MENU</div>
+        <div class="nav-item" :class="{ active: currentTab === 'appointments' }"
+          @click="currentTab = 'appointments'; isSidebarOpen = false">
           <span class="icon">📋</span> Appointments
         </div>
-        <div class="nav-item" :class="{ active: currentTab === 'calendar' }" @click="currentTab = 'calendar'">
+        <div class="nav-item" :class="{ active: currentTab === 'calendar' }"
+          @click="currentTab = 'calendar'; isSidebarOpen = false">
           <span class="icon">📅</span> Calendar
         </div>
-        <div class="nav-item" :class="{ active: currentTab === 'profile' }" @click="currentTab = 'profile'">
+        <div class="nav-item" :class="{ active: currentTab === 'profile' }"
+          @click="currentTab = 'profile'; isSidebarOpen = false">
           <span class="icon">👤</span> Profile
         </div>
       </nav>
+
+      <div class="logout-section">
+        <button @click="handleLogout" class="btn-logout">
+          <span class="icon">🚪</span> Logout
+        </button>
+      </div>
     </aside>
 
+    <!-- MAIN CONTENT -->
     <main class="main-content">
-      <header class="page-header">
-        <h1>
-          {{
-            currentTab === 'calendar' ? 'Availability Calendar' :
-              currentTab === 'profile' ? 'My Profile' : 'My Appointments'
-          }}
-        </h1>
+
+      <!-- HEADER (UPDATED) -->
+      <header class="top-bar">
+        <div class="header-left">
+          <button class="menu-toggle" @click="toggleSidebar">☰</button>
+          <div class="page-title">
+            <h1>{{ currentTab === 'calendar' ? 'Availability Calendar' : (currentTab === 'profile' ? 'My Profile' : 'MyAppointments') }}</h1>
+          </div>
+        </div>
+
+        <!-- NEW: HEADER RIGHT ACTIONS & PROFILE -->
+        <div class="header-right-actions">
+          <!-- MOVE BOOK BUTTON HERE (Only visible on Appointments Tab) -->
+          <button v-if="currentTab === 'appointments'" class="btn-header-book" @click="navigateToBook">
+            <span class="plus">+</span> Book New Appointment
+          </button>
+
+          <div class="user-profile">
+            <div class="avatar-circle">U</div>
+            <span class="username-text">User</span>
+          </div>
+        </div>
+        <!-- END HEADER RIGHT ACTIONS -->
       </header>
 
-      <div class="content-scrollable">
+      <!-- SCROLLABLE CONTENT AREA -->
+      <div class="content-scroll-area">
 
-        <div v-if="currentTab === 'appointments'">
+        <!-- 1. APPOINTMENTS TAB (TABLE) -->
+        <div v-if="currentTab === 'appointments'" class="view-container">
+
+          <!-- Vaccine Status Card -->
           <div class="status-card">
             <div class="status-left">
               <span class="label">Available Vaccine</span>
@@ -159,36 +194,75 @@ const openDetails = (appt) => {
           </div>
 
           <div v-if="isLoading" class="loading-container">
-            <div class="spinner"></div>
-            <p>Loading appointments...</p>
+            <p>Loading...</p>
           </div>
           <div v-else-if="error" class="error-container">
-            <p>{{ error }}</p><button @click="fetchAppointments" class="retry-btn">Retry</button>
+            <p>{{ error }}</p>
           </div>
-          <div v-else-if="appointments.length === 0" class="empty-container">
-            <p>No appointments found.</p>
-          </div>
-          <div v-else class="appointment-list">
-            <div v-for="appt in appointments" :key="appt.id" class="appt-card" @click="openDetails(appt)">
-              <div class="icon-circle"><span class="paw-icon">🐾</span></div>
-              <div class="appt-info">
-                <h3>{{ appt.name || 'Unknown' }}</h3>
-                <p>{{ appt.animalType || appt.animal }} • {{ appt.date }} @ {{ appt.time }}</p>
-              </div>
-              <div class="arrow">›</div>
+
+          <!-- Appointments Table -->
+          <div v-else class="table-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Patient Name</th>
+                    <th>Animal</th>
+                    <th>Date & Time</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- FIX: Use sortedAppointments computed property -->
+                  <!-- NOTE: Row click opens details -->
+                  <tr v-for="appointment in sortedAppointments" :key="appointment.id" @click="openDetails(appointment)">
+
+                    <td>
+                      <div class="fw-bold">{{ appointment.name }}</div>
+                    </td>
+                    <!-- Animal Type -->
+                    <td>
+                      <div class="fw-bold">{{ appointment.animal_type }}</div>
+                    </td>
+
+                    <!-- Date/Time -->
+                    <td>
+                      <div class="fw-bold">{{ appointment.date }}</div>
+                      <small style="color:#1565C0;">{{ appointment.time }}</small>
+                    </td>
+
+                    <!-- Status (Hidden on small mobile) -->
+                    <td class="status-cell">
+                      <span class="status-badge" :class="(appointment.status || 'pending').toLowerCase()">
+                        {{ appointment.status || 'Pending' }}
+                      </span>
+                    </td>
+
+                    <!-- Action: BUTTON CLICK IS SEPARATE FOR EDITING -->
+                    <td>
+                      <button class="btn-sm btn-edit-appt" @click="navigateToEdit(appointment, $event)">
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="appointments.length === 0">
+                    <td colspan="4" style="text-align:center; padding: 20px;">No appointments found.</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
+          <!-- End Appointments Table -->
 
-          <button class="btn-book" @click="navigateToBook">
-            <span class="plus">+</span> Book New Appointment
-          </button>
         </div>
 
+        <!-- 2. CALENDAR TAB (UPDATED STYLING) -->
         <div v-else-if="currentTab === 'calendar'" class="calendar-view">
-          <div class="calendar-header">
+          <div class="calendar-header-controls">
             <button @click="changeMonth(-1)" class="nav-arrow">‹</button>
             <h2 class="month-title">{{ formattedMonthYear }}</h2>
-            <button class="toggle-btn">2 weeks</button> <button @click="changeMonth(1)" class="nav-arrow">›</button>
+            <button @click="changeMonth(1)" class="nav-arrow">›</button>
           </div>
 
           <div class="week-header">
@@ -198,12 +272,12 @@ const openDetails = (appt) => {
           <div class="calendar-grid">
             <div v-for="(dateObj, index) in calendarDays" :key="index" class="day-cell" :class="{
               'empty': dateObj.type === 'padding',
-              'selected': dateObj.day === selectedDate,
-              'available': dateObj.status === 'available' && dateObj.day !== selectedDate,
-              'full': dateObj.status === 'full' && dateObj.day !== selectedDate,
-              'half': dateObj.status === 'half' && dateObj.day !== selectedDate
-            }" @click="selectDate(dateObj)">
-              {{ dateObj.day }}
+              'selected': dateObj.day === selectedDate && dateObj.type === 'current',
+              'available': dateObj.status === 'available' && dateObj.type === 'current',
+              'full': dateObj.status === 'full' && dateObj.type === 'current',
+              'half': dateObj.status === 'half' && dateObj.type === 'current'
+            }" @click="dateObj.type === 'current' ? selectedDate = dateObj.day : null">
+              <span v-if="dateObj.day">{{ dateObj.day }}</span>
             </div>
           </div>
 
@@ -214,23 +288,11 @@ const openDetails = (appt) => {
           </div>
         </div>
 
+        <!-- 3. PROFILE TAB -->
         <div v-else-if="currentTab === 'profile'" class="profile-view">
-          <div class="profile-card">
-            <div class="profile-header">
-              <div class="avatar-large">👤</div>
-              <h3>My Account</h3>
-              <p class="user-role">User Access</p>
-            </div>
-
-            <div class="profile-options">
-              <button class="option-btn">My Details</button>
-              <button class="option-btn">Change Password</button>
-              <button class="option-btn">Notification Settings</button>
-            </div>
-
-            <button class="btn-logout" @click="handleLogout">
-              Log Out
-            </button>
+          <div class="empty-container">
+            <p>Profile Settings Coming Soon...</p>
+            <button class="btn-logout-profile" @click="handleLogout">Logout</button>
           </div>
         </div>
 
@@ -240,234 +302,462 @@ const openDetails = (appt) => {
 </template>
 
 <style scoped>
-/* --- EXISTING STYLES --- */
-.layout-container {
+/* =========================================
+   1. LAYOUT STRUCTURE (Fixed Sidebar)
+   ========================================= */
+.dashboard-layout {
   display: flex;
   height: 100vh;
-  background-color: #f8f9fa;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #F5F7FA;
   font-family: 'Segoe UI', sans-serif;
 }
 
+/* =========================================
+   2. SIDEBAR STYLING (Blue/White Theme)
+   ========================================= */
 .sidebar {
-  width: 240px;
+  width: 260px;
+  height: 100%;
   background-color: white;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid #CFD8DC;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  flex-shrink: 0;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 900;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.mobile-overlay.show {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Sidebar Items */
+.brand {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid #E0E0E0;
 }
 
 .brand h2 {
-  color: #009688;
-  margin: 0 0 40px 0;
+  color: #1565C0;
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.role-badge {
+  background: #E3F2FD;
+  color: #1565C0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin-left: 5px;
+  border: 1px solid #BBDEFB;
+}
+
+.nav-menu {
+  padding: 20px 15px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.nav-section-label {
+  font-size: 0.75rem;
+  color: #999;
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-left: 10px;
 }
 
 .nav-item {
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  border-radius: 8px;
-  color: #555;
-  font-weight: 500;
   display: flex;
   align-items: center;
+  padding: 12px 15px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #546E7A;
+  font-weight: 500;
+  border: 1px solid transparent;
 }
 
 .nav-item:hover {
-  background-color: #f0f0f0;
+  background-color: #F5F7FA;
+  color: #1565C0;
+  border-color: #E3F2FD;
 }
 
 .nav-item.active {
-  background-color: #e0f2f1;
-  color: #009688;
+  background-color: #E3F2FD;
+  color: #1565C0;
+  border-color: #BBDEFB;
 }
 
-.nav-item .icon {
+.icon {
   margin-right: 12px;
 }
 
+.logout-section {
+  padding: 20px;
+  border-top: 1px solid #E0E0E0;
+  margin-top: auto;
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 12px;
+  background: white;
+  border: 1px solid #FFCDD2;
+  color: #C62828;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btn-logout:hover {
+  background: #FFEBEE;
+  border-color: #EF9A9A;
+}
+
+/* =========================================
+   3. MAIN CONTENT (Scrollable)
+   ========================================= */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
-.page-header {
-  padding: 20px 30px;
+.top-bar {
+  height: 70px;
   background: white;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #CFD8DC;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  flex-shrink: 0;
 }
 
-.page-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: #333;
-}
-
-.content-scrollable {
+/* FIX: Ensure content area can scroll, not just body */
+.content-scroll-area {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 30px;
-  max-width: 800px;
+  padding: 30px;
 }
 
+/* Header Elements (Combined for right side) */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  /* Space between button and profile */
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+}
+
+.avatar-circle {
+  width: 35px;
+  height: 35px;
+  background-color: #1565C0;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.username-text {
+  font-weight: 500;
+  color: #37474F;
+}
+
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+.close-btn-mobile {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #999;
+}
+
+@media (max-width: 768px) {
+  .menu-toggle {
+    display: block;
+  }
+
+  .close-btn-mobile {
+    display: block;
+  }
+
+  .username-text {
+    display: none;
+  }
+
+  /* Hide header button on small mobile so it doesn't crowd the top bar */
+  .btn-header-book {
+    display: none;
+  }
+}
+
+/* --- NEW HEADER BUTTON STYLE --- */
+.btn-header-book {
+  background-color: #1565C0;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(21, 101, 192, 0.2);
+  transition: background 0.2s;
+}
+
+.btn-header-book:hover {
+  background-color: #0D47A1;
+}
+
+.btn-header-book .plus {
+  font-size: 1.1rem;
+  margin-right: 5px;
+  line-height: 1;
+}
+
+
+/* =========================================
+   4. USER CONTENT STYLES
+   ========================================= */
+.view-container {
+  margin: 0;
+  width: 100%;
+}
+
+/* Status Card (Vaccine Info) */
 .status-card {
-  background-color: #e0f2f1;
+  background-color: #E3F2FD;
   border-radius: 12px;
   padding: 20px;
   display: flex;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border: 1px solid #BBDEFB;
+  /* Stroke */
 }
 
 .label {
   display: block;
   font-weight: bold;
   font-size: 0.9rem;
-  color: #333;
+  color: #1565C0;
 }
 
 .value-text {
-  color: #616161;
+  color: #546E7A;
   font-size: 0.9rem;
 }
 
 .highlight-number {
-  color: #00796b;
+  color: #1565C0;
   font-size: 1.2rem;
   font-weight: bold;
 }
 
-.loading-container,
-.empty-container,
-.error-container {
-  text-align: center;
-  padding: 40px;
-  color: #757575;
-}
-
-.appt-card {
+/* TABLE STYLES */
+.table-card {
   background: white;
-  padding: 16px;
   border-radius: 12px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: transform 0.1s;
-}
-
-.appt-card:hover {
-  transform: translateY(-2px);
-}
-
-.icon-circle {
-  background-color: #009688;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16px;
-}
-
-.paw-icon {
-  color: white;
-  font-size: 1.2rem;
-}
-
-.appt-info {
-  flex: 1;
-}
-
-.appt-info h3 {
-  margin: 0 0 4px 0;
-  font-size: 1rem;
-  color: #333;
-}
-
-.appt-info p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #757575;
-}
-
-.arrow {
-  color: #bdbdbd;
-  font-weight: bold;
-  font-size: 1.2rem;
-}
-
-.btn-book {
-  width: 100%;
-  background-color: #009688;
-  color: white;
-  border: none;
-  padding: 16px;
-  border-radius: 30px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  box-shadow: 0 4px 6px rgba(0, 150, 136, 0.3);
-}
-
-.plus {
-  font-size: 1.4rem;
-  margin-right: 8px;
-  line-height: 1;
-}
-
-/* --- CALENDAR STYLES --- */
-.calendar-view {
-  background: white;
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-}
-
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid #CFD8DC;
+  /* Stroke */
   margin-bottom: 20px;
 }
 
-.month-title {
-  font-size: 1.1rem;
+.table-responsive {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px;
+}
+
+.data-table th {
+  /* FIX: Center align header text */
+  text-align: center;
+  padding: 15px;
+  background: #1565C0;
+  color: white;
+  border-bottom: 1px solid #0D47A1;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.data-table td {
+  padding: 15px;
+  border-bottom: 1px solid #EEEEEE;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.data-table tr:hover td {
+  background-color: #F5F7FA;
+}
+
+.fw-bold {
+  font-weight: 600;
   color: #333;
-  margin: 0;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.badge.pending {
+  background: #FFF3E0;
+  color: #EF6C00;
+  border-color: #FFE0B2;
+}
+
+.badge.confirmed {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-color: #C8E6C9;
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  border: 1px solid #CFD8DC;
+  background: white;
+  color: #546E7A;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-sm.btn-edit-appt {
+  color: #1565C0;
+  border-color: #BBDEFB;
+}
+
+.btn-sm.btn-edit-appt:hover {
+  background-color: #E3F2FD;
+}
+
+/* Book Button (Original, now unused) */
+.btn-book {
+  display: none;
+  /* Hide the large button */
+}
+
+/* Calendar View Styles */
+.calendar-view {
+  background: white;
+  padding: 30px;
+  /* Increased padding */
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  border: 1px solid #CFD8DC;
+  width: 100%;
+}
+
+.calendar-header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding: 0 5px;
+}
+
+.month-title {
+  font-size: 1.4rem;
+  color: #333;
+  margin: 0 auto;
+  font-weight: 600;
+  text-align: center;
+  flex-grow: 1;
 }
 
 .nav-arrow {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   cursor: pointer;
   color: #333;
+  padding: 0 10px;
 }
 
-.toggle-btn {
-  padding: 5px 12px;
-  border: 1px solid #333;
-  border-radius: 20px;
-  background: white;
-  font-size: 0.8rem;
-  cursor: default;
+.nav-arrow:hover {
+  color: #1565C0;
 }
 
 .week-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  color: #888;
-  font-size: 0.9rem;
-  margin-bottom: 10px;
+  color: #78909C;
+  font-size: 1rem;
+  margin-bottom: 15px;
+  font-weight: 500;
 }
 
 .calendar-grid {
@@ -478,58 +768,78 @@ const openDetails = (appt) => {
 }
 
 .day-cell {
-  height: 40px;
-  width: 40px;
+  width: 100%;
+  padding-top: 100%;
+  position: relative;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto;
-  border-radius: 50%;
-  font-size: 0.9rem;
+  font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s;
+  color: #444;
+}
+
+.day-cell>span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 500;
+}
+
+/* Color Styles for Status */
+.day-cell.empty {
+  cursor: default;
+  background: transparent;
+}
+
+.day-cell.selected>span {
+  background-color: #1565C0;
+  color: white;
+  font-weight: bold;
+  transform: scale(1.05);
+}
+
+.day-cell.available>span {
+  background-color: #81C784;
   color: white;
 }
 
-.day-cell.empty {
-  cursor: default;
-}
-
-.day-cell.available {
-  background-color: #81C784;
-}
-
-.day-cell.half {
+.day-cell.half>span {
   background-color: #FFB74D;
+  color: white;
 }
 
-.day-cell.full {
+.day-cell.full>span {
   background-color: #E57373;
+  color: white;
 }
 
-.day-cell.selected {
-  background-color: #009688;
-  font-weight: bold;
-  transform: scale(1.1);
-}
-
+/* Legend Styles */
 .calendar-legend {
   display: flex;
   justify-content: center;
-  gap: 20px;
-  margin-top: 30px;
+  gap: 30px;
+  margin-top: 40px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: #333;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   margin-right: 8px;
 }
@@ -546,78 +856,22 @@ const openDetails = (appt) => {
   background-color: #E57373;
 }
 
-/* --- NEW PROFILE STYLES --- */
-.profile-view {
-  background: white;
-  padding: 30px;
-  border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  display: flex;
-  justify-content: center;
-}
-
-.profile-card {
-  width: 100%;
-  max-width: 400px;
+/* Profile / Empty States */
+.loading-container,
+.error-container,
+.empty-container {
   text-align: center;
+  padding: 40px;
+  color: #757575;
 }
 
-.avatar-large {
-  font-size: 3rem;
-  background: #e0f2f1;
-  width: 80px;
-  height: 80px;
-  line-height: 80px;
-  border-radius: 50%;
-  margin: 0 auto 15px;
-  color: #009688;
-}
-
-.profile-header h3 {
-  margin: 0;
-  color: #333;
-}
-
-.user-role {
-  color: #777;
-  font-size: 0.9rem;
-  margin-top: 5px;
-}
-
-.profile-options {
-  margin: 30px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.option-btn {
-  background: #f9f9f9;
-  border: 1px solid #eee;
-  padding: 12px;
+.btn-logout-profile {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: #FFCDD2;
+  color: #C62828;
+  border: 1px solid #EF9A9A;
   border-radius: 8px;
-  text-align: left;
-  cursor: not-allowed;
-  /* Placeholder items */
-  color: #555;
-}
-
-.btn-logout {
-  width: 100%;
-  background-color: #ff5252;
-  /* Red for warning */
-  color: white;
-  border: none;
-  padding: 14px;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 6px rgba(255, 82, 82, 0.2);
-  transition: background-color 0.2s;
-}
-
-.btn-logout:hover {
-  background-color: #e53935;
+  font-weight: bold;
 }
 </style>

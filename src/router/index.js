@@ -38,6 +38,11 @@ const routes = [
       ),
   },
   {
+    path: "/edit-appointment/:id", // 
+    name: "Edit",
+    component: () => import("../views/UserRole/EditAppointmentView.vue"),
+  },
+  {
     path: "/appointment/:id", // :id allows dynamic URLs like /appointment/5
     name: "AppointmentDetails",
     component: () => import("../views/UserRole/AppointmentDetailView.vue"),
@@ -47,6 +52,7 @@ const routes = [
     name: "Admin",
     component: () => import("../views/AdminRole/AdminDashboardView.vue"),
   },
+  
 
   // --- END OF NEW ROUTE ---
 ];
