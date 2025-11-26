@@ -359,7 +359,6 @@ const handleLogout = () => {
     border-color: #BBDEFB;
 }
 
-/* Stroke on active */
 .icon {
     margin-right: 12px;
 }
