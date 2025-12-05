@@ -1,6 +1,9 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000/api/'; // Change as needed
+// CHANGE: Use a relative path.
+// This allows the Vue DevServer Proxy to intercept the request and forward it to Laravel.
+// It also solves CORS issues automatically.
+const API_URL = '/api/'; 
 
 export function register(name, email, password, password_confirmation) {
   return axios.post(API_URL + 'register', {
@@ -23,3 +26,15 @@ export function logout(token) {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+

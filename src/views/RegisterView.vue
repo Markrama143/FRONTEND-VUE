@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-center">
     <form @submit.prevent="submit">
       <h1>Register</h1>
@@ -48,4 +48,17 @@ const submit = async () => {
 }
 
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
 

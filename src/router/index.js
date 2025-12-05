@@ -1,60 +1,53 @@
-import { createRouter, createWebHistory } from "vue-router";
+﻿import { createRouter, createWebHistory } from "vue-router";
 import LoginView from "../views/LoginView.vue";
+import DashboardView from "../views/UserRole/DashboardView.vue";
+import CreateAppointmentView from "../views/UserRole/CreateAppointmentView.vue";
+import AppointmentDetailView from "../views/UserRole/AppointmentDetailView.vue";
+import EditAppointmentView from "../views/UserRole/EditAppointmentView.vue";
+import AdminDashboardView from "../views/AdminRole/AdminDashboardView.vue";
+import VaccineRestockView from "../views/AdminRole/VaccineRestockView.vue";  // Ensure this import is correct
 
 const routes = [
   {
-    path: "/",
+    path: "/", // Set root path back to Login
     name: "Login",
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
     component: LoginView,
   },
   {
     path: "/dashboard",
     name: "Dashboard",
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () =>
-      import(/* webpackChunkName: "about" */ "../views/UserRole/DashboardView.vue"),
+    component: DashboardView,
   },
   {
     path: "/register",
     name: "Register",
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () =>
-      import(/* webpackChunkName: "about" */ "../views/RegisterView.vue"),
-  },
-  // --- HERE IS THE NEW ROUTE I ADDED ---
+    component: () => import("../views/RegisterView.vue"),
+  }, // --- USER APPOINTMENT ROUTES ---
   {
     path: "/create",
     name: "CreateAppointment",
-    component: () =>
-      import(
-        /* webpackChunkName: "about" */ "../views/UserRole/CreateAppointmentView.vue" // <-- FIXED
-      ),
+    component: CreateAppointmentView,
   },
   {
-    path: "/edit-appointment/:id", // 
-    name: "Edit",
-    component: () => import("../views/UserRole/EditAppointmentView.vue"),
-  },
-  {
-    path: "/appointment/:id", // :id allows dynamic URLs like /appointment/5
+    path: "/appointment/:id",
     name: "AppointmentDetails",
-    component: () => import("../views/UserRole/AppointmentDetailView.vue"),
+    component: AppointmentDetailView,
   },
   {
-    path: "/admin", // 
+    path: "/edit-appointment/:id",
+    name: "Edit",
+    component: EditAppointmentView,
+  }, // --- ADMIN ROUTE ---
+  {
+    path: "/admin",
     name: "Admin",
-    component: () => import("../views/AdminRole/AdminDashboardView.vue"),
+    component: AdminDashboardView,
   },
-  
-
-  // --- END OF NEW ROUTE ---
+    {
+    path: "/admin/vaccine-restock",
+    name: "vaccine-restock",
+    component: VaccineRestockView,
+  },
 ];
 
 const router = createRouter({
@@ -63,3 +56,16 @@ const router = createRouter({
 });
 
 export default router;
+
+
+
+
+
+
+
+
+
+
+
+
+

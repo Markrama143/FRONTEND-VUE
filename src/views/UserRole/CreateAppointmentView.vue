@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import apiServices from '@/services/apiService';
@@ -25,6 +25,17 @@ const allTimeSlots = [
   '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM',
 ];
 
+const convertTimeToDateObject = (timeStr) => {
+  const [time, modifier] = timeStr.split(' ');
+  let [hours, minutes] = time.split(':');
+
+  if (hours === '12') hours = '00';
+  if (modifier === 'PM') hours = String(parseInt(hours, 10) + 12);
+
+  const d = new Date();
+  d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+  return d;
+};
 
 const availableSlots = computed(() => {
   if (!form.value.date) return [];
@@ -38,23 +49,11 @@ const availableSlots = computed(() => {
     return allTimeSlots;
   }
 
-
-  return allTimeSlots.filter(slot => {
-    const [time, modifier] = slot.split(' ');
-    let [hours, minutes] = time.split(':');
-
-    if (hours === '12') hours = '00';
-    if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
-
-    const slotDateTime = new Date();
-    slotDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-    return slotDateTime > now;
+  return allTimeSlots.filter((slot) => {
+    const slotDate = convertTimeToDateObject(slot);
+    return slotDate > now;
   });
 });
-
-
-
 
 const goBack = () => {
   router.push('/dashboard');
@@ -195,10 +194,6 @@ const submitBooking = async () => {
 </template>
 
 <style scoped>
-/* =========================================
-   WEBSITE LAYOUT & DASHBOARD STYLE (Blue/White)
-   ========================================= */
-
 /* FIX: Page container takes full width and height */
 .page-container {
   max-width: 100%;
@@ -255,7 +250,6 @@ const submitBooking = async () => {
   color: #0D47A1;
 }
 
-/* --- Messages (Consistent Feedback) --- */
 .message {
   padding: 15px 20px;
   margin: 10px 0;
@@ -412,3 +406,15 @@ input[type="time"] {
   box-shadow: none;
 }
 </style>
+
+
+
+
+
+
+
+
+
+
+
+

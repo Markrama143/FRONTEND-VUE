@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import apiService from '@/services/apiService';
@@ -140,12 +140,6 @@ const handleLogout = () => {
           <span class="icon">👤</span> Profile
         </div>
       </nav>
-
-      <div class="logout-section">
-        <button @click="handleLogout" class="btn-logout">
-          <span class="icon">🚪</span> Logout
-        </button>
-      </div>
     </aside>
 
     <!-- MAIN CONTENT -->
@@ -875,3 +869,15 @@ const handleLogout = () => {
   font-weight: bold;
 }
 </style>
+
+
+
+
+
+
+
+
+
+
+
+

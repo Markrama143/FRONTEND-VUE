@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <button @click="logoutUser">Logout</button>
   <div v-if="error">{{ error }}</div>
 </template>
@@ -25,3 +25,16 @@ const logoutUser = async () => {
   }
 }
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
