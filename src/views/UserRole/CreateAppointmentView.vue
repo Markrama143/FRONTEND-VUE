@@ -92,7 +92,16 @@ const submitBooking = async () => {
     // 3. Call API
     const response = await apiServices.createAppointment(bookingData);
 
-    // 4. Success Feedback
+    // 4. Deduct vaccine stock (1 vaccine per appointment)
+    try {
+      await apiServices.deductVaccineStock(1);
+      console.log('Vaccine stock deducted successfully');
+    } catch (vaccineError) {
+      console.warn('Failed to deduct vaccine stock:', vaccineError);
+      // Continue anyway - appointment is created
+    }
+
+    // 5. Success Feedback
     successMessage.value = "Appointment Booked Successfully!";
     console.log('Booking response:', response);
 
@@ -406,6 +415,32 @@ input[type="time"] {
   box-shadow: none;
 }
 </style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

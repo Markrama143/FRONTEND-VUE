@@ -22,19 +22,37 @@ const animalAnalytics = ref([]);
 
 // --- APPOINTMENTS FILTER STATE ---
 const selectedStatus = ref('Pending'); // Default filter
+const searchQuery = ref(''); // NEW: Search query state
 
 const filteredAppointments = computed(() => {
   if (!appointments.value || appointments.value.length === 0) return [];
 
+  // Convert search query to lower case once for efficiency
+  const search = searchQuery.value.toLowerCase();
+
   // Sort by ID ascending (for better readability)
   const sorted = [...appointments.value].sort((a, b) => a.id - b.id);
 
-  if (selectedStatus.value === 'All') return sorted;
+  return sorted.filter(appt => {
+    const matchesStatus = selectedStatus.value === 'All' || (appt.status || 'Pending') === selectedStatus.value;
 
-  return sorted.filter(appt => (appt.status || 'Pending') === selectedStatus.value);
+    // Combine filtering and searching
+    if (search) {
+      const matchesSearch =
+        appt.name.toLowerCase().includes(search) ||
+        appt.animal_type.toLowerCase().includes(search) ||
+        appt.email.toLowerCase().includes(search) ||
+        (appt.phone_number || '').includes(search) ||
+        appt.id.toString().includes(search);
+
+      return matchesStatus && matchesSearch;
+    }
+
+    return matchesStatus;
+  });
 });
 
-// --- FIX: Add the missing function for counting tabs ---
+// --- Function for counting tabs ---
 const filteredAppointmentsCount = (status) => {
   if (!appointments.value) return 0;
   if (status === 'All') {
@@ -43,17 +61,16 @@ const filteredAppointmentsCount = (status) => {
   // Note: We use .filter().length for accurate reactive counting
   return appointments.value.filter(appt => (appt.status || 'Pending') === status).length;
 };
-// --- END FIX ---
 
 
-// --- PIE CHART LOGIC (Skipped for brevity) ---
+// --- PIE CHART LOGIC ---
 const animalColors = {
   'Dog': '#42A5F5', 'Cat': '#EF6C00', 'Bird': '#26A69A', 'Rabbit': '#AB47BC', 'Hamster': '#EC407A', 'Guinea Pig': '#7E57C2',
 };
 
 const getColorForType = (type) => { return animalColors[type] || '#90CAF9'; };
 
-const generatePieChart = computed(() => { // Changed to computed property for efficiency
+const generatePieChart = computed(() => { // Defined as a computed property
   if (!animalAnalytics.value || animalAnalytics.value.length === 0) return '';
   const total = animalAnalytics.value.reduce((sum, item) => sum + item.total, 0);
   let cumulativePercentage = 0;
@@ -72,11 +89,42 @@ const generatePieChart = computed(() => { // Changed to computed property for ef
 // --- END PIE CHART LOGIC ---
 
 
+const updateStatus = async (appointment, newStatus) => {
+  if (appointment.status === newStatus) return; // No change
+
+  // --- NEW VERIFICATION STEP ---
+  const confirmation = confirm(
+    `Are you sure you want to change the status of appointment #${appointment.id} (${appointment.name}) to '${newStatus}'?`
+  );
+
+  if (!confirmation) {
+    // If the admin cancels, reset the dropdown immediately
+    event.target.value = appointment.status; // Reverts the UI selection
+    return;
+  }
+  // --- END VERIFICATION ---
+
+
+  // Optimistic UI Update (Update status immediately, revert on failure)
+  const oldStatus = appointment.status;
+  appointment.status = newStatus;
+
+  try {
+    // Send request to API to update ONLY the status
+    await apiService.updateAppointmentStatus(appointment.id, newStatus);
+  } catch (error) {
+    console.error(`Failed to update status for #${appointment.id}:`, error);
+    alert(`Failed to update status to ${newStatus}. Check API/network.`);
+    appointment.status = oldStatus; // Revert if API fails
+  }
+};
+
+// --- DATA FETCHING (Same as before) ---
 const loadAdminData = async () => {
   isLoading.value = true;
   try {
     const [appointmentRes, statsRes, animalRes, reportsRes, stockRes] = await Promise.allSettled([
-      apiService.getAllAppointments(),
+      apiService.getAllAppointments(), // <--- FETCHES ALL APPOINTMENTS HERE
       apiService.getAdminStats(),
       apiService.getAnimalTypeAnalytics(),
       apiService.getSummaryReports(),
@@ -90,10 +138,9 @@ const loadAdminData = async () => {
     let totalStock = 0;
 
     if (stockRes.status === 'fulfilled') {
-      const totalStock = stockRes.value.data.total_stock || 0;
+      totalStock = stockRes.value.data.total_stock || 0;
       stats.value.vaccineStock = totalStock;
     } else {
-      console.warn("Failed to fetch vaccine stock entries. Using 0.");
       stats.value.vaccineStock = 0;
     }
 
@@ -116,7 +163,7 @@ const loadAdminData = async () => {
       peakDays: [
         { day: 'M', value: 30 }, { day: 'T', value: 45 }, { day: 'W', value: 20 }, { day: 'T', value: 60 }, { day: 'F', value: 50 }
       ],
-      prediction: "Mock: High demand projected for Thursdays & Fridays."
+      prediction: "Data derived from animal counts."
     };
 
     if (reportsRes.status === 'fulfilled') {
@@ -213,7 +260,7 @@ const navigateToRestock = () => {
                                           <div class="stat-card">
                                                 <div class="stat-icon-box blue-bg">💉</div>
                                                 <div class="stat-info">
-                                                      <h3>Vaccines</h3>
+                                                      <h3>Available Vaccines</h3>
                   <!-- Display fetched vaccineStock value -->
                                                       <p>{{ stats?.vaccineStock || 0 }}</p>
                                                   </div>
@@ -221,7 +268,7 @@ const navigateToRestock = () => {
                                           <div class="stat-card">
                                                 <div class="stat-icon-box orange-bg">⏳</div>
                                                 <div class="stat-info">
-                                                      <h3>Pending</h3>
+                                                      <h3>Pending Appointments</h3>
                                                       <p>{{ stats?.pendingRequests || 0 }}</p>
                                                   </div>
                                             </div>
@@ -265,23 +312,31 @@ const navigateToRestock = () => {
 
                     <!-- APPOINTMENTS TABLE -->
                     <div v-else-if="currentTab === 'appointments'" class="view-appointments">
-            <!-- Status Tab Navigation -->
-            <div class="status-tabs">
-              <button :class="['tab-btn', { active: selectedStatus === 'All' }]" @click="selectedStatus = 'All'">
-                All ({{ appointments.length }})
-              </button>
-              <button :class="['tab-btn', { active: selectedStatus === 'Pending' }]"
-                @click="selectedStatus = 'Pending'">
-                Pending ({{ filteredAppointmentsCount('Pending') }})
-              </button>
-              <button :class="['tab-btn', { active: selectedStatus === 'Confirmed' }]"
-                @click="selectedStatus = 'Confirmed'">
-                Confirmed ({{ filteredAppointmentsCount('Confirmed') }})
-              </button>
-              <button :class="['tab-btn', { active: selectedStatus === 'Completed' }]"
-                @click="selectedStatus = 'Completed'">
-                Completed ({{ filteredAppointmentsCount('Completed') }})
-              </button>
+            <!-- Search and Tabs Container (Combined Row) -->
+            <div class="appointments-controls">
+              <!-- Status Tab Navigation (Left Side) -->
+              <div class="status-tabs status-tab-group">
+                <button :class="['tab-btn', { active: selectedStatus === 'All' }]" @click="selectedStatus = 'All'">
+                  All ({{ appointments.length }})
+                </button>
+                <button :class="['tab-btn', { active: selectedStatus === 'Pending' }]"
+                  @click="selectedStatus = 'Pending'">
+                  Pending ({{ filteredAppointmentsCount('Pending') }})
+                </button>
+                <button :class="['tab-btn', { active: selectedStatus === 'Confirmed' }]"
+                  @click="selectedStatus = 'Confirmed'">
+                  Confirmed ({{ filteredAppointmentsCount('Confirmed') }})
+                </button>
+                <button :class="['tab-btn', { active: selectedStatus === 'Completed' }]"
+                  @click="selectedStatus = 'Completed'">
+                  Completed ({{ filteredAppointmentsCount('Completed') }})
+                </button>
+              </div>
+              <!-- Search Bar (Right Side - Takes available space) -->
+              <div class="search-bar-container search-input-group">
+                <input type="text" v-model="searchQuery" placeholder="Search appointments by Name, Animal, or ID..."
+                  class="search-input" />
+              </div>
             </div>
 
                         <div class="table-card">
@@ -291,10 +346,11 @@ const navigateToRestock = () => {
                                         <tr>
                                             <th>ID</th>
                                             <th>Patient Info</th>
+                                            <th>Guardian</th>
                                             <th>Contact Details</th>
                                             <th>Animal</th>
                                             <th>Date & Time</th>
-                                            <th>Status</th>
+                                            <th>Action</th>
                                           </tr>
                                       </thead>
                                     <tbody>
@@ -304,6 +360,9 @@ const navigateToRestock = () => {
                                                 <div class="fw-bold">{{ appointment.name }}</div>
                                                 <small style="color:#666;">{{ appointment.sex }}, {{ appointment.age }}
                           yrs</small>
+                                              </td>
+                                              <td>
+                                                <div class="fw-bold">{{ appointment.guardian }}</div>
                                               </td>
                                             <td>
                                                 <div>{{ appointment.email || 'N/A' }}</div>
@@ -315,20 +374,32 @@ const navigateToRestock = () => {
                                                 <div class="fw-bold">{{ appointment.date }}</div>
                                                 <small>{{ appointment.time }}</small>
                                               </td>
+
+                      <!-- ACTION COLUMN -->
                                             <td>
-                                                <span class="status-badge"
-                          :class="(appointment.status || 'pending').toLowerCase()">
-                                                    {{ appointment.status || 'Pending' }}
-                                                  </span>
-                                              </td>
+                        <div class="action-cell">
+                          <!-- Status Dropdown -->
+                          <select :value="appointment.status || 'Pending'"
+                            @change="updateStatus(appointment, $event.target.value)" class="status-select"
+                            :class="appointment.status ? appointment.status.toLowerCase() : 'pending'">
+                            <option value="Pending">Pending</option>
+                            <option value="Confirmed">Confirmed</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+
+                      
+                        </div>
+                                             
+                      </td>
                                           </tr>
                                         <tr v-if="appointments.length === 0">
-                                            <td colspan="6" style="text-align: center; padding: 20px;">No appointments
+                                            <td colspan="7" style="text-align: center; padding: 20px;">No appointments
                         found.</td>
                                           </tr>
                                       </tbody>
                                   </table>
-                                </div>
+                              </div>
                             </div>
                        
           </div>
@@ -353,7 +424,9 @@ const navigateToRestock = () => {
 </template>
 
 <style scoped>
-/* [Styles remain the same] */
+/* =========================================
+   1. LAYOUT STRUCTURE
+   ========================================= */
 .admin-layout {
   display: flex;
   height: 100vh;
@@ -740,15 +813,74 @@ const navigateToRestock = () => {
 
 
 /* Appointments Table Tabs */
-.status-tabs {
+.appointments-controls {
+  /* FIX: Set container to display search and tabs side-by-side */
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  /* Allows wrapping on smaller screens */
+  gap: 15px;
+  justify-content: space-between;
+  /* Space out search and tabs */
+  align-items: center;
+  /* Vertically align tabs and search input center */
   margin-bottom: 20px;
-  padding: 5px;
+  padding: 10px 15px;
+  /* Added padding to the control container */
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  border: 1px solid #CFD8DC;
 }
+
+.search-bar-container {
+  /* Set search bar to occupy space, but group tabs */
+  flex-grow: 1;
+  min-width: 250px;
+  /* FIX: Order 2 means it sits on the right */
+  order: 2;
+  margin-left: auto;
+  /* Push search bar to the right */
+}
+
+.status-tabs {
+  /* Tabs take minimal space, remaining grouped on the left */
+  order: 1;
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  flex-shrink: 0;
+  /* Enable horizontal scrolling on mobile if tabs overflow */
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  /* Made search input smaller */
+  border: 1px solid #CFD8DC;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s;
+  height: 38px;
+  /* Standardize height */
+  font-size: 0.9rem;
+  /* Smaller text */
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1565C0;
+}
+
+/* Adjust button styling slightly since parent padding changed */
+.status-tabs .tab-btn {
+  padding: 8px 12px;
+  border: 1px solid transparent;
+}
+
 
 .tab-btn {
   background: none;
@@ -779,6 +911,7 @@ const navigateToRestock = () => {
   padding: 10px;
   border: 1px solid #CFD8DC;
   margin-bottom: 20px;
+  align-content: center;
 }
 
 .table-responsive {

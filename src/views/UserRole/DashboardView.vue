@@ -10,7 +10,7 @@ const isLoading = ref(true);
 const error = ref(null);
 const isSidebarOpen = ref(false); // Added for mobile menu
 
-const vaccineInfo = ref({ name: 'Anti-Rabies (Verorab)', remaining: 42 });
+const vaccineInfo = ref({ name: 'Anti-Rabies (Verorab)', remaining: 0 });
 
 // --- Calendar State ---
 const today = new Date();
@@ -869,6 +869,32 @@ const handleLogout = () => {
   font-weight: bold;
 }
 </style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
