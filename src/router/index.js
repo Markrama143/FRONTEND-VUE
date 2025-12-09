@@ -5,7 +5,8 @@ import CreateAppointmentView from "../views/UserRole/CreateAppointmentView.vue";
 import AppointmentDetailView from "../views/UserRole/AppointmentDetailView.vue";
 import EditAppointmentView from "../views/UserRole/EditAppointmentView.vue";
 import AdminDashboardView from "../views/AdminRole/AdminDashboardView.vue";
-import VaccineRestockView from "../views/AdminRole/VaccineRestockView.vue";  // Ensure this import is correct
+import VaccineRestockView from "../views/AdminRole/VaccineRestockView.vue";
+import AdminHolidaysView from "../views/AdminRole/AdminHolidaysView.vue"; // 💡 NEW IMPORT
 
 const routes = [
   {
@@ -37,16 +38,21 @@ const routes = [
     path: "/edit-appointment/:id",
     name: "Edit",
     component: EditAppointmentView,
-  }, // --- ADMIN ROUTE ---
+  }, // --- ADMIN ROUTES ---
   {
     path: "/admin",
     name: "Admin",
     component: AdminDashboardView,
   },
-    {
+  {
     path: "/admin/vaccine-restock",
     name: "vaccine-restock",
     component: VaccineRestockView,
+  },
+  {
+    path: "/admin/holidays", // 🗓️ NEW ROUTE
+    name: "AdminHolidays",
+    component: AdminHolidaysView,
   },
 ];
 
@@ -56,40 +62,6 @@ const router = createRouter({
 });
 
 export default router;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
