@@ -80,13 +80,12 @@ onMounted(() => {
 <template>
         <div class="page-container">
 
-        <!-- Header with Back Button -->
         <header class="app-bar">
             <button @click="goBack" class="back-btn">
                 <span class="material-icon">←</span>
             </button>
-                        <h1>💉 Vaccine Availability Manager</h1>
-                   
+                <h1>💉 Vaccine Availability Manager</h1>
+                             
         </header>
 
                 <div class="content-wrapper">
@@ -332,6 +331,10 @@ label {
     }
 }
 </style>
+
+
+
+
 
 
 

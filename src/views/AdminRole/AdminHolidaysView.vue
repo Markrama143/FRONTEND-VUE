@@ -139,13 +139,13 @@ onMounted(() => {
 <template>
       <div class="holidays-view-container">
            
-            <div class="header-section">
+            <div class="app-bar">
       <button @click="goBack" class="back-btn">
                         <span class="material-icon">←</span>
                     </button>
                   <h2>Calendar & Holiday Management 🗓️</h2>
-                  <p>Use this page to set clinic holidays or non-working days. Appointments cannot be booked on these
-        dates.</p>
+                  
+          
              
     </div>
 
@@ -361,6 +361,21 @@ onMounted(() => {
   gap: 5px;
 }
 
+.back-btn {
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    cursor: pointer;
+    color: #1565C0;
+    padding: 0;
+    margin-right: 15px;
+    transition: color 0.2s;
+}
+
+.back-btn:hover {
+    color: #0D47A1;
+}
+
 .btn-edit:hover {
   background: #FFCC80;
 }
@@ -459,4 +474,15 @@ onMounted(() => {
 .btn-secondary:hover {
   background-color: #E0E0E0;
 }
+
+.app-bar {
+    display: flex;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid #CFD8DC;
+    background: transparent;
+    margin-bottom: 25px;
+}
 </style>
+
+
